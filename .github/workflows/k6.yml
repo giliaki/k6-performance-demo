@@ -1,0 +1,25 @@
+name: k6 Performance Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  k6-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run k6 smoke test
+        uses: grafana/run-k6-action@v1
+        with:
+          path: ./tests/smoke-test.js
