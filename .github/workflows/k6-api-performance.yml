@@ -1,0 +1,28 @@
+name: k6 API Performance Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  api-performance-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run authenticated API load test
+        env:
+          K6_WEB_DASHBOARD: "true"
+          K6_WEB_DASHBOARD_EXPORT: "authenticated-api-load-report.html"
+        run: |
+          k6 run tests/api-auth-load-test.js
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-api-load-report
+          path: authenticated-api-load-report.html
