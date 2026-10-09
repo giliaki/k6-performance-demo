@@ -2,7 +2,7 @@
 
 This repository contains a hands-on performance testing project built with Grafana k6.
 
-The project demonstrates protocol-level load testing, authenticated REST API testing, browser-based user journeys, GraphQL validation, custom metrics, performance thresholds, HTML reporting, and CI execution with GitHub Actions.
+The project demonstrates protocol-level load testing, authenticated REST API testing, browser-based user journeys, GraphQL validation, custom metrics, performance thresholds, HTML reporting, and CI/CD execution with GitHub Actions.
 
 The goal is to demonstrate how functional validation and performance acceptance criteria can be combined in realistic k6 scenarios.
 
@@ -23,7 +23,9 @@ The goal is to demonstrate how functional validation and performance acceptance 
 - Browser testing
 - Web Vitals
 - HTML dashboard reports
-- GitHub Actions / CI
+- GitHub Actions
+- CI/CD performance testing
+- Workflow artifacts
 
 ---
 
@@ -142,9 +144,19 @@ Thresholds:
 - Overall HTTP p95 < 800 ms
 - Login p95 < 800 ms
 - More than 99% of checks must pass
-- Login failure rate < 1%
+- Login functional failure rate < 1%
 
-During the tested workload, the API remained stable and response-time percentiles remained below the configured performance threshold.
+Functional validation and performance acceptance are evaluated independently.
+
+A login request can therefore be functionally successful while still exceeding a performance target.
+
+Example successful execution:
+
+- 1,063 requests
+- 100% functional checks passed
+- 0% HTTP failures
+- 0% login failures
+- Login p95: approximately 198 ms
 
 Run:
 
@@ -243,7 +255,7 @@ Functional validation and performance acceptance are intentionally evaluated sep
 
 A response can therefore be functionally successful while still failing a performance threshold if its response time is too high.
 
-Example successful execution:
+Example successful local execution:
 
 - 100% functional checks passed
 - 0% HTTP failures
@@ -369,9 +381,9 @@ Custom metrics make it possible to evaluate individual business operations indep
 
 ---
 
-## HTML Performance Report
+## HTML Performance Reports
 
-The repository contains an exported k6 web dashboard report:
+The repository contains an exported local k6 web dashboard report:
 
 `Reports/authenticated-api-load-report.html`
 
@@ -397,29 +409,131 @@ $env:K6_WEB_DASHBOARD_EXPORT="Reports/authenticated-api-load-report.html"
 k6 run tests/api-auth-load-test.js
 ```
 
+The on-demand GitHub Actions performance workflow also generates an HTML dashboard report automatically and stores it as a workflow artifact.
+
 ---
 
 ## GitHub Actions
 
-The project includes a GitHub Actions workflow:
+The project contains two GitHub Actions workflows with different purposes.
+
+### 1. Continuous Smoke Test
+
+Workflow:
 
 `.github/workflows/k6.yml`
 
-The workflow automatically runs the k6 smoke test when changes are pushed to the `main` branch or when a pull request targets `main`.
+This workflow runs automatically when:
+
+- Changes are pushed to `main`
+- A pull request targets `main`
+
+It executes the lightweight smoke test:
+
+`tests/smoke-test.js`
 
 The workflow:
 
 1. Checks out the repository
-2. Installs Grafana k6
+2. Sets up Grafana k6
 3. Executes the smoke test
 4. Evaluates the configured thresholds
-5. Fails the workflow if the performance criteria are not met
+5. Fails if the performance acceptance criteria are not met
 
-This demonstrates how performance tests can be integrated into a CI/CD pipeline.
+This acts as a lightweight performance gate in CI.
 
 ---
 
-## Running the Tests
+### 2. On-Demand API Performance Test
+
+Workflow:
+
+`.github/workflows/k6-api-performance.yml`
+
+This workflow uses:
+
+```yaml
+on:
+  workflow_dispatch:
+```
+
+It is therefore triggered manually from the GitHub Actions interface rather than running on every commit.
+
+The workflow executes:
+
+`tests/api-auth-load-test.js`
+
+The workflow:
+
+1. Checks out the repository
+2. Sets up Grafana k6
+3. Executes the authenticated API load test
+4. Evaluates functional checks
+5. Evaluates performance thresholds
+6. Generates an HTML k6 dashboard report
+7. Uploads the report as a GitHub Actions artifact
+
+This separates lightweight CI validation from more resource-intensive performance test execution.
+
+Example successful GitHub Actions execution:
+
+- Approximately 1.2k requests
+- Approximately 10.65 requests/second
+- Maximum workload: 20 VUs
+- 100% checks passed
+- 0% HTTP failures
+- 0% ratings failures
+- HTTP request p95: approximately 63 ms
+- Ratings endpoint p95: approximately 63 ms
+- HTML performance report successfully uploaded as an artifact
+
+Results from different execution environments should not be treated as directly comparable benchmarks.
+
+For example, local execution and GitHub-hosted runners can have different network paths, geographic locations, and infrastructure characteristics.
+
+---
+
+## CI/CD Strategy
+
+The project intentionally separates two types of performance execution.
+
+### Continuous Validation
+
+```text
+Push / Pull Request
+        ↓
+GitHub Actions
+        ↓
+k6 Smoke Test
+        ↓
+Threshold Evaluation
+        ↓
+Pass / Fail
+```
+
+This test is small enough to run regularly as part of CI.
+
+### On-Demand Performance Execution
+
+```text
+Manual Workflow Trigger
+        ↓
+GitHub Actions Runner
+        ↓
+Authenticated API Load Test
+        ↓
+Threshold Evaluation
+        ↓
+HTML Report Generation
+        ↓
+Artifact Upload
+```
+
+This allows heavier performance scenarios to be executed when needed without running load tests against external services on every code change.
+
+---
+
+## Running the Tests Locally
 
 Clone the repository and make sure Grafana k6 is installed.
 
@@ -463,6 +577,27 @@ k6 run tests/flight-search-browser.js
 
 ---
 
+## Running the API Performance Test in GitHub Actions
+
+The authenticated API load test can also be executed remotely using GitHub Actions.
+
+Steps:
+
+1. Open the repository on GitHub
+2. Go to **Actions**
+3. Select **k6 API Performance Test**
+4. Click **Run workflow**
+5. Select the `main` branch
+6. Start the workflow
+
+When execution completes, the HTML report is available as:
+
+`authenticated-api-load-report`
+
+under the workflow run artifacts.
+
+---
+
 ## Project Structure
 
 ```text
@@ -470,7 +605,8 @@ k6-performance-demo/
 │
 ├── .github/
 │   └── workflows/
-│       └── k6.yml
+│       ├── k6.yml
+│       └── k6-api-performance.yml
 │
 ├── Reports/
 │   └── authenticated-api-load-report.html
@@ -509,6 +645,10 @@ This project currently demonstrates practical experience with:
 - Monitoring Web Vitals
 - Exporting HTML performance reports
 - Running performance tests in CI
+- Creating manually triggered performance workflows
+- Generating reports in CI
+- Publishing performance reports as workflow artifacts
+- Separating continuous smoke validation from heavier load-test execution
 
 ---
 
